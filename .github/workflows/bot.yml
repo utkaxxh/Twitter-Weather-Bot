@@ -2,9 +2,9 @@ name: CityBot
 
 on:
   schedule:
-    - cron: "30 2 * * *"    # 8:00 AM IST (Weather)
-    - cron: "30 7 * * *"    # 1:00 PM IST (AQI)
-    - cron: "30 12 * * *"   # 6:00 PM IST (Sunset)
+    - cron: "30 2 * * *"    # 8:00 AM IST Weather
+    - cron: "30 7 * * *"    # 1:00 PM IST AQI
+    - cron: "30 12 * * *"   # 6:00 PM IST Sunset
   workflow_dispatch:
 
 jobs:
@@ -31,15 +31,14 @@ jobs:
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual trigger: Running all tasks"
             python bot.py weather
             python bot.py aqi
             python bot.py sunset
             exit 0
           fi
 
-          HOUR=$(date -u +%H:%M)
+          TIME=$(date -u +%H:%M)
 
-          if [ "$HOUR" = "02:30" ]; then python bot.py weather; fi
-          if [ "$HOUR" = "07:30" ]; then python bot.py aqi; fi
-          if [ "$HOUR" = "12:30" ]; then python bot.py sunset; fi
+          if [ "$TIME" = "02:30" ]; then python bot.py weather; fi
+          if [ "$TIME" = "07:30" ]; then python bot.py aqi; fi
+          if [ "$TIME" = "12:30" ]; then python bot.py sunset; fi
