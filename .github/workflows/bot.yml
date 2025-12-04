@@ -1,11 +1,11 @@
-name: Daily Nagpur Weather Tweet
+name: Nagpur Weather Bot (Morning & Evening)
 
 on:
   schedule:
-    # Runs at 02:30 UTC everyday, which is 08:00 AM IST (Nagpur time)
-    - cron: '30 2 * * *'
+    # Runs at 02:30 UTC (8:00 AM IST) and 11:30 UTC (5:00 PM IST)
+    - cron: '30 2,11 * * *'
   
-  # Allows you to run this workflow manually from the Actions tab for testing
+  # Allows manual testing
   workflow_dispatch:
 
 jobs:
@@ -28,7 +28,6 @@ jobs:
 
       - name: Run Weather Bot
         env:
-          # These secrets must be set in your GitHub Repo Settings
           CONSUMER_KEY: ${{ secrets.CONSUMER_KEY }}
           CONSUMER_SECRET: ${{ secrets.CONSUMER_SECRET }}
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
