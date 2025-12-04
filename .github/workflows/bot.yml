@@ -1,44 +1,37 @@
-name: CityBot
+name: Daily Nagpur Weather Tweet
 
 on:
   schedule:
-    - cron: "30 2 * * *"    # 8:00 AM IST Weather
-    - cron: "30 7 * * *"    # 1:00 PM IST AQI
-    - cron: "30 12 * * *"   # 6:00 PM IST Sunset
+    # Runs at 02:30 UTC everyday, which is 08:00 AM IST (Nagpur time)
+    - cron: '30 2 * * *'
+  
+  # Allows you to run this workflow manually from the Actions tab for testing
   workflow_dispatch:
 
 jobs:
-  run-bot:
+  tweet_weather:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: '3.9'
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run bot
-        env:
-          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
-          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
-          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
-          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
-          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+      - name: Install Dependencies
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            python bot.py weather
-            python bot.py aqi
-            python bot.py sunset
-            exit 0
-          fi
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-          TIME=$(date -u +%H:%M)
-
-          if [ "$TIME" = "02:30" ]; then python bot.py weather; fi
-          if [ "$TIME" = "07:30" ]; then python bot.py aqi; fi
-          if [ "$TIME" = "12:30" ]; then python bot.py sunset; fi
+      - name: Run Weather Bot
+        env:
+          # These secrets must be set in your GitHub Repo Settings
+          CONSUMER_KEY: ${{ secrets.CONSUMER_KEY }}
+          CONSUMER_SECRET: ${{ secrets.CONSUMER_SECRET }}
+          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          ACCESS_TOKEN_SECRET: ${{ secrets.ACCESS_TOKEN_SECRET }}
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+        run: python bot.py
