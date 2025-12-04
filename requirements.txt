@@ -1,2 +1,3 @@
+tweepy>=4.10.0
 requests
-tweepy
+pytz
