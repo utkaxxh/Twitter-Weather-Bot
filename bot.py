@@ -1,136 +1,83 @@
+import tweepy
+import requests
 import os
 import sys
-import requests
-from datetime import datetime, timedelta
+from datetime import datetime
+import pytz
 
-CITY = "Nagpur"
-LAT = 21.1458
-LON = 79.0882
+# 1. Load Environment Variables
+CONSUMER_KEY = os.environ.get("CONSUMER_KEY")
+CONSUMER_SECRET = os.environ.get("CONSUMER_SECRET")
+ACCESS_TOKEN = os.environ.get("ACCESS_TOKEN")
+ACCESS_TOKEN_SECRET = os.environ.get("ACCESS_TOKEN_SECRET")
+OPENWEATHER_API_KEY = os.environ.get("OPENWEATHER_API_KEY")
 
+# 2. Debugging: Verify variables are present (without printing the actual secrets)
+if not all([CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET, OPENWEATHER_API_KEY]):
+    print("❌ Error: One or more environment variables are missing.")
+    sys.exit(1)
 
-# ------------------------------------------------
-# TWEET USING TWITTER API V2
-# ------------------------------------------------
-def tweet(text):
-    bearer = os.getenv("TWITTER_BEARER_TOKEN")
-
-    if not bearer:
-        print("Missing TWITTER_BEARER_TOKEN!")
-        return
-
-    url = "https://api.twitter.com/2/tweets"
-    headers = {
-        "Authorization": f"Bearer {bearer}",
-        "Content-Type": "application/json"
-    }
-
-    response = requests.post(url, json={"text": text}, headers=headers)
-
-    if response.status_code != 201:
-        print("Tweet failed:", response.status_code, response.text)
-    else:
-        print("Tweet posted:", text)
-
-
-# ------------------------------------------------
-# WEATHER from OpenWeather
-# ------------------------------------------------
 def get_weather():
-    api_key = os.getenv("OPENWEATHER_API_KEY")
-    if not api_key:
-        return "Missing OPENWEATHER_API_KEY"
-
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={CITY}&appid={api_key}&units=metric"
-    r = requests.get(url).json()
-
     try:
-        temp = r["main"]["temp"]
-        humidity = r["main"]["humidity"]
-        desc = r["weather"][0]["description"].title()
-        wind = r["wind"]["speed"]
-
-        return (
-            f"{CITY} Weather Update\n"
-            f"{desc}\n"
-            f"Temp: {temp}°C\n"
-            f"Humidity: {humidity}%\n"
-            f"Wind: {wind} m/s"
+        # Nagpur coordinates or query
+        city = "Nagpur"
+        country_code = "IN"
+        url = f"http://api.openweathermap.org/data/2.5/weather?q={city},{country_code}&appid={OPENWEATHER_API_KEY}&units=metric"
+        
+        response = requests.get(url)
+        data = response.json()
+        
+        if response.status_code != 200:
+            print(f"❌ Error fetching weather: {data.get('message', 'Unknown error')}")
+            sys.exit(1)
+            
+        # Extract data
+        temp = data["main"]["temp"]
+        humidity = data["main"]["humidity"]
+        desc = data["weather"][0]["description"].capitalize()
+        
+        # Get current date for Nagpur
+        ist = pytz.timezone('Asia/Kolkata')
+        today = datetime.now(ist).strftime("%d %b %Y")
+        
+        # Format the tweet text
+        tweet_text = (
+            f"📍 Weather Update for #Nagpur ({today})\n\n"
+            f"🌡️ Temperature: {temp}°C\n"
+            f"☁️ Condition: {desc}\n"
+            f"💧 Humidity: {humidity}%\n\n"
+            f"#NagpurWeather #WeatherUpdate"
         )
-    except Exception:
-        return "Weather data unavailable right now."
+        return tweet_text
 
-
-# ------------------------------------------------
-# AQI from OpenWeather (Air Pollution API)
-# ------------------------------------------------
-def get_aqi():
-    api_key = os.getenv("OPENWEATHER_API_KEY")
-
-    url = f"https://api.openweathermap.org/data/2.5/air_pollution?lat={LAT}&lon={LON}&appid={api_key}"
-    r = requests.get(url).json()
-
-    try:
-        aqi_index = r["list"][0]["main"]["aqi"]
-        pm25 = r["list"][0]["components"]["pm2_5"]
-
-        # AQI meaning per OpenWeather scale
-        meaning = {
-            1: "Good",
-            2: "Fair",
-            3: "Moderate",
-            4: "Poor",
-            5: "Very Poor"
-        }.get(aqi_index, "Unknown")
-
-        return (
-            f"{CITY} Air Quality Update\n"
-            f"AQI: {aqi_index} ({meaning})\n"
-            f"PM2.5: {pm25} µg/m³"
-        )
-    except Exception:
-        return f"AQI data unavailable for {CITY} right now."
-
-
-# ------------------------------------------------
-# SUNSET (sunrise-sunset API)
-# ------------------------------------------------
-def get_sunset():
-    url = f"https://api.sunrise-sunset.org/json?lat={LAT}&lng={LON}&formatted=0"
-    r = requests.get(url).json()
-
-    try:
-        sunset_utc = r["results"]["sunset"]
-
-        sunset_local = (
-            datetime.fromisoformat(sunset_utc.replace("Z", "+00:00"))
-            + timedelta(hours=5, minutes=30)
-        )
-        sunset_str = sunset_local.strftime("%I:%M %p")
-
-        return f"{CITY} Sunset Time\nSunset today at {sunset_str}"
-
-    except Exception:
-        return "Sunset data not available."
-
-
-# ------------------------------------------------
-# MAIN HANDLER
-# ------------------------------------------------
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python bot.py [weather|aqi|sunset]")
+    except Exception as e:
+        print(f"❌ Exception in get_weather: {e}")
         sys.exit(1)
 
-    task = sys.argv[1].lower()
+def post_tweet(text):
+    try:
+        # 3. Authenticate with Twitter API v2 (Required for Free Tier)
+        client = tweepy.Client(
+            consumer_key=CONSUMER_KEY,
+            consumer_secret=CONSUMER_SECRET,
+            access_token=ACCESS_TOKEN,
+            access_token_secret=ACCESS_TOKEN_SECRET
+        )
 
-    if task == "weather":
-        tweet(get_weather())
+        # 4. Post the tweet
+        response = client.create_tweet(text=text)
+        print(f"✅ Tweet posted successfully! Tweet ID: {response.data['id']}")
+        
+    except tweepy.Errors.Forbidden as e:
+        print(f"❌ 403 Forbidden Error. This usually means your API keys don't have Write permissions.")
+        print(f"Details: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Error posting tweet: {e}")
+        sys.exit(1)
 
-    elif task == "aqi":
-        tweet(get_aqi())
-
-    elif task == "sunset":
-        tweet(get_sunset())
-
-    else:
-        print("Unknown command:", task)
+if __name__ == "__main__":
+    print("🚀 Starting Weather Bot...")
+    weather_update = get_weather()
+    print(f"📝 Generated Tweet:\n{weather_update}")
+    post_tweet(weather_update)
