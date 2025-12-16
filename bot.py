@@ -20,11 +20,8 @@ if not all([CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET, OP
 def calculate_aqi(pm25):
     """
     Converts raw PM2.5 (µg/m³) to US EPA AQI (0-500 scale).
-    Formula based on standard US EPA breakpoints.
     """
     c = float(pm25)
-    
-    # Breakpoints: (Concentration Low, Concentration High, Index Low, Index High)
     breakpoints = [
         (0.0, 12.0, 0, 50),
         (12.1, 35.4, 51, 100),
@@ -34,19 +31,13 @@ def calculate_aqi(pm25):
         (250.5, 350.4, 301, 400),
         (350.5, 500.4, 401, 500)
     ]
-
     for c_low, c_high, i_low, i_high in breakpoints:
         if c_low <= c <= c_high:
             aqi = ((i_high - i_low) / (c_high - c_low)) * (c - c_low) + i_low
             return int(round(aqi))
-    
-    # If off the charts (>500.4), just return 500+
     return 500
 
 def get_aqi_label(aqi_score):
-    """
-    Returns label and emoji based on the 0-500 AQI score
-    """
     if aqi_score <= 50:
         return "Good", "🟢", ""
     elif aqi_score <= 100:
@@ -91,26 +82,23 @@ def get_weather_data():
         health_tip = ""
 
         if aqi_response.status_code == 200:
-            # 1. Get raw PM2.5 (µg/m³)
             pm2_5_raw = aqi_data['list'][0]['components']['pm2_5']
-            
-            # 2. Convert to US EPA scale (0-500)
             aqi_score = calculate_aqi(pm2_5_raw)
-            
-            # 3. Get label
             aqi_label, warning_emoji, health_tip = get_aqi_label(aqi_score)
 
         # --- Format Tweet ---
         ist = pytz.timezone('Asia/Kolkata')
-        today = datetime.now(ist).strftime("%d %b %Y")
+        # FIX: Added Time (%I:%M %p) to make tweet unique every run
+        now_str = datetime.now(ist).strftime("%d %b %Y, %I:%M %p")
         
         tweet_text = (
-            f"📍 Weather Update for #Nagpur ({today})\n\n"
+            f"📍 Weather Update for #Nagpur ({now_str})\n\n"
             f"🌡️ Temperature: {temp}°C\n"
             f"☁️ Condition: {desc}\n"
             f"💧 Humidity: {humidity}%\n"
             f"🍃 Air Quality: {aqi_label} ({aqi_score}) {warning_emoji}"
             f"{health_tip}\n\n"
+            f"#NagpurWeather #WeatherUpdate"
         )
         return tweet_text
 
@@ -130,8 +118,9 @@ def post_tweet(text):
         response = client.create_tweet(text=text)
         print(f"✅ Tweet posted successfully! Tweet ID: {response.data['id']}")
         
-    except tweepy.Errors.Forbidden as e:
-        print(f"❌ 403 Forbidden Error. Details: {e}")
+    except tweepy.errors.Forbidden as e:  # <--- FIXED TYPO HERE
+        print(f"❌ 403 Forbidden Error. This usually means 'Duplicate Content' or 'Write Permission' missing.")
+        print(f"Details: {e}")
         sys.exit(1)
     except Exception as e:
         print(f"❌ Error posting tweet: {e}")
